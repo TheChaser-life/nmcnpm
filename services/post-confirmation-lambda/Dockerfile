@@ -28,3 +28,4 @@ COPY handler.py ${LAMBDA_TASK_ROOT}/
 
 # Lambda handler entry point: <module>.<function>
 CMD ["handler.handler"]
+# CI/CD smoke test marker.

@@ -6,7 +6,6 @@ on:
       - dev
     paths:
       - 'services/**'
-      - '.github/workflows/**'
 
 jobs:
   scan_source_code:

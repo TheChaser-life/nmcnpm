@@ -51,3 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Run the tour service
 CMD ["python", "-u", "tour_service.py"]
+# CI/CD smoke test marker.

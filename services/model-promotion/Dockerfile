@@ -27,3 +27,4 @@ COPY lambda_function.py ${LAMBDA_TASK_ROOT}/
 
 # Lambda handler: <tên_file>.<tên_hàm>.
 CMD ["lambda_function.lambda_handler"]
+# CI/CD smoke test marker.

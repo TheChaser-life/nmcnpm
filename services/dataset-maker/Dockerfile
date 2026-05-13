@@ -46,3 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run as a one-shot task (ECS will stop the container after this exits)
 CMD ["python", "-u", "dataset_maker.py"]
+# CI/CD smoke test marker.

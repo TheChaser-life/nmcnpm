@@ -51,3 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Run the money service
 CMD ["python", "-u", "money_service.py"]
+# CI/CD smoke test marker.

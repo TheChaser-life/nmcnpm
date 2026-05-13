@@ -83,3 +83,4 @@ EXPOSE 8080
 
 # SageMaker starts training with "train" and hosting with "serve".
 ENTRYPOINT ["/opt/program/entrypoint"]
+# CI/CD smoke test marker.

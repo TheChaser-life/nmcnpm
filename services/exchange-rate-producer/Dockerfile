@@ -46,3 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the producer service
 CMD ["python", "-u", "producer.py"]
+# CI/CD smoke test marker.
