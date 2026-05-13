@@ -25,5 +25,5 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages ${LAMBDA_TASK_ROOT}
 # Copy source code vào LAMBDA_TASK_ROOT (mặc định /var/task)
 COPY lambda_function.py ${LAMBDA_TASK_ROOT}/
 
-# Lambda handler: <tên_file>.<tên_hàm>
+# Lambda handler: <tên_file>.<tên_hàm>.
 CMD ["lambda_function.lambda_handler"]

@@ -15,7 +15,7 @@
 #     post-confirmation-lambda
 #
 #   curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" \
-#     -d @test_event.json
+#     -d @test_event.json.
 
 FROM public.ecr.aws/lambda/python:3.12
 

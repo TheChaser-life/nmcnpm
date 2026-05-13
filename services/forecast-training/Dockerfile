@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
+# Copy only requirements first to leverage Docker cache.
 COPY requirements.txt .
 
 # Install dependencies to /usr/local (default pip install location)

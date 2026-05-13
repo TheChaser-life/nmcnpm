@@ -11,7 +11,7 @@ COPY . .
 
 RUN npm run build
 
-# ── Stage 2: Runner ─────────────────────────────────────────────────────────
+# ── Stage 2: Runner. ─────────────────────────────────────────────────────────
 FROM node:20-alpine
 
 ENV NODE_ENV=production
