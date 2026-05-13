@@ -13,7 +13,7 @@ RUN npm ci --frozen-lockfile 2>/dev/null || npm install
 COPY . .
 
 # Build the application
-# Build args are passed as environment variables for Vite.
+# Build args are passed as environment variables for Vite
 ARG VITE_COGNITO_USER_POOL_ID
 ARG VITE_COGNITO_CLIENT_ID
 ARG VITE_AWS_REGION=ap-southeast-2
