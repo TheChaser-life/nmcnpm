@@ -106,6 +106,17 @@ resource "aws_secretsmanager_secret_version" "travelpayouts_api_key_version" {
     secret_string = var.travelpayouts_api_key
 }
 
+# tạo secret của viator api key
+resource "aws_secretsmanager_secret" "viator_api_key" {
+    name = "nmcnpm/viator_api_key"
+    recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "viator_api_key_version" {
+    secret_id = aws_secretsmanager_secret.viator_api_key.id
+    secret_string = var.viator_api_key
+}
+
 # tạo secret của exchange_rate_api
 resource "aws_secretsmanager_secret" "exchange_rate_api_key" {
     name = "nmcnpm/exchange_rate_api_key"

@@ -337,6 +337,25 @@ class TestToursEndpoint(unittest.TestCase):
         self.assertIn("image_presigned_url", data["tours"][0])
         self.assertEqual(data["tours"][0]["image_presigned_url"], "https://presigned.url/image.jpg")
 
+    def test_rewrites_legacy_placeholder_viator_affiliate_url(self):
+        """GET /tours/{currency_code} rewrites legacy Viator 404 URLs."""
+        self.mock_reader.list_tour_keys.return_value = ["tours/JPY/tour-abc123.json"]
+        self.mock_reader.read_tour.return_value = {
+            "id": "abc123",
+            "name": "Kyoto Cultural Immersion",
+            "affiliate_url": "https://www.viator.com/tours/Kyoto/Kyoto-Walking-Tour",
+            "image_key": "",
+        }
+
+        response = self.client.get("/tours/JPY")
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(
+            data["tours"][0]["affiliate_url"],
+            "https://www.viator.com/searchResults/all?text=Kyoto+Cultural+Immersion",
+        )
+
     def test_sets_image_presigned_url_to_empty_string_when_image_key_empty(self):
         """GET /tours/{currency_code} sets image_presigned_url to empty string when image_key is empty."""
         self.mock_reader.list_tour_keys.return_value = ["tours/JPY/tour-abc123.json"]

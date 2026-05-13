@@ -61,19 +61,91 @@ jobs:
         id: ecr_login
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: resolve_deploy_targets
+        # Ứng với mỗi service sẽ có các biến môi trường khác nhau như ECR_REPOSITORY, TASK_DEFINITION, CONTAINER_NAME, ECS_SERVICES, EVENTBRIDGE_RULE... để tái sử dụng chung code deploy ở bước sau, tránh hardcode nhiều chỗ và dễ bảo trì khi thêm/sửa service
+        run: |
+          case "${{ matrix.service }}" in
+            exchange-rate-producer)
+              echo "ECR_REPOSITORY=exchange_rate_producer_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Exchange_Rate_Producer_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Exchange_Rate_Producer_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Exchange_Rate_Producer_Service_AZ_1 Exchange_Rate_Producer_Service_AZ_22" >> $GITHUB_ENV
+              ;;
+            streaming-service)
+              echo "ECR_REPOSITORY=streaming_exchange_rate_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Streaming_Exchange_Rate_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Streaming_Exchange_Rate_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Streaming_Exchange_Rate_Service" >> $GITHUB_ENV
+              ;;
+            money-service)
+              echo "ECR_REPOSITORY=update_money_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Money_Service_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Money_Service_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Money_Service" >> $GITHUB_ENV
+              ;;
+            forecast-service)
+              echo "ECR_REPOSITORY=forecast_exchange_rate_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Forecast_Exchange_Rate_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Forecast_Exchange_Rate_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Forecast_Exchange_Rate_Service" >> $GITHUB_ENV
+              ;;
+            tour-producer)
+              echo "ECR_REPOSITORY=tour_producer_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Tour_Producer_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Tour_Producer_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_RULE=scheduled_tour_producer_task" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_TARGET_ID=scheduled_tour_producer_target" >> $GITHUB_ENV
+              ;;
+            tour-service)
+              echo "ECR_REPOSITORY=tour_display_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Tour_Service_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Tour_Service_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Tour_Service" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
+              ;;
+            dataset-maker)
+              echo "ECR_REPOSITORY=dataset_maker_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Dataset_Maker_Task_Definition" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Dataset_Maker_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
+              ;;
+            frontend)
+              echo "ECR_REPOSITORY=frontend_repo" >> $GITHUB_ENV
+              echo "TASK_DEFINITION=Frontend_Task" >> $GITHUB_ENV
+              echo "CONTAINER_NAME=Frontend_Container" >> $GITHUB_ENV
+              echo "ECS_SERVICES=Frontend_Service" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
+              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "Unknown service: ${{ matrix.service }}" >&2
+              exit 1
+              ;;
+          esac
+
       # ── Build image với tag commit SHA ─────────────────────────────────────
       - name: build_image
         env:
           ECR_REGISTRY: ${{ steps.ecr_login.outputs.registry }}
         run: |
-          IMAGE_URI="$ECR_REGISTRY/${{ matrix.service }}:${{ github.sha }}"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          BRANCH_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:main"
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "BRANCH_IMAGE_URI=$BRANCH_IMAGE_URI" >> $GITHUB_ENV
           echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
+
+          # --cache-from "$BRANCH_IMAGE_URI" giúp tận dụng cache từ image trước đó nếu có, giảm thời gian build cho những thay đổi nhỏ
+          # --build-arg BUILDKIT_INLINE_CACHE=1 để embed metadata cache vào image, giúp cache hiệu quả hơn ở lần build sau
+          docker pull "$BRANCH_IMAGE_URI" || true
 
           docker build \
             --tag "$IMAGE_URI" \
-            --tag "$ECR_REGISTRY/${{ matrix.service }}:latest" \
-            --cache-from "$ECR_REGISTRY/${{ matrix.service }}:latest" \
+            --tag "$BRANCH_IMAGE_URI" \
+            --cache-from "$BRANCH_IMAGE_URI" \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             "services/${{ matrix.service }}"
 
@@ -81,7 +153,7 @@ jobs:
       - name: push_to_ecr
         run: |
           docker push "$IMAGE_URI"
-          docker push "$ECR_REGISTRY/${{ matrix.service }}:latest"
+          docker push "$BRANCH_IMAGE_URI"
           echo "Pushed: $IMAGE_URI"
 
       # ── Cập nhật ECS Task Definition và trigger rolling deploy ─────────────
@@ -90,18 +162,25 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           ECS_CLUSTER: ${{ secrets.ECS_CLUSTER_NAME }}
         run: |
-          # Lấy task definition hiện tại
+          # Lấy JSON mô tả task definition hiện tại (image, env. ...)
           TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition "${{ matrix.service }}" \
+            --task-definition "$TASK_DEFINITION" \
             --query 'taskDefinition' \
             --output json)
 
+          echo "$TASK_DEF" | jq -e \
+            --arg CONTAINER "$CONTAINER_NAME" \
+            '.containerDefinitions[] | select(.name == $CONTAINER)' > /dev/null
+
           # Cập nhật image URI trong container definition
+          # Bơm biến IMAGE_URI (tên image vừa push) và matrix.service (tên service) vào JSON, chỉ update image của container tương ứng, giữ nguyên các trường khác để tránh lỗi khi register task definition mới
+          # Kiểm tra điều kiện .name == $SVC để chỉ update đúng container cần deploy, tránh ảnh hưởng đến các container khác trong task definition nếu có
+          # Xóa các trường không cần thiết như taskDefinitionArn, revision, status... để tránh lỗi khi register task definition mới vì AWS sẽ tự động tạo các trường này
           NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
             --arg IMAGE "$IMAGE_URI" \
-            --arg SVC "${{ matrix.service }}" \
+            --arg CONTAINER "$CONTAINER_NAME" \
             '.containerDefinitions |= map(
-              if .name == $SVC then .image = $IMAGE else . end
+              if .name == $CONTAINER then .image = $IMAGE else . end
             ) |
             del(.taskDefinitionArn, .revision, .status,
                 .requiresAttributes, .compatibilities,
@@ -116,13 +195,38 @@ jobs:
           echo "Registered new task definition: $NEW_TASK_DEF_ARN"
 
           # Cập nhật ECS service với task definition mới (rolling deploy)
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "${{ matrix.service }}" \
-            --task-definition "$NEW_TASK_DEF_ARN" \
-            --force-new-deployment
+          if [ -n "$ECS_SERVICES" ]; then
+            for ECS_SERVICE in $ECS_SERVICES; do
+              aws ecs update-service \
+                --cluster "$ECS_CLUSTER" \
+                --service "$ECS_SERVICE" \
+                --task-definition "$NEW_TASK_DEF_ARN" \
+                --force-new-deployment
 
-          echo "ECS rolling deployment triggered for ${{ matrix.service }}"
+              echo "ECS rolling deployment triggered for $ECS_SERVICE"
+            done
+          else
+            echo "${{ matrix.service }} has no long-running ECS service."
+          fi
+
+          if [ -n "$EVENTBRIDGE_RULE" ]; then
+            TARGET=$(aws events list-targets-by-rule \
+              --rule "$EVENTBRIDGE_RULE" \
+              --query "Targets[?Id=='$EVENTBRIDGE_TARGET_ID'] | [0]" \
+              --output json)
+
+            echo "$TARGET" | jq -e '.Id' > /dev/null
+
+            UPDATED_TARGETS=$(echo "$TARGET" | jq \
+              --arg TASK_DEF_ARN "$NEW_TASK_DEF_ARN" \
+              '(.EcsParameters.TaskDefinitionArn = $TASK_DEF_ARN) | [.]')
+
+            aws events put-targets \
+              --rule "$EVENTBRIDGE_RULE" \
+              --targets "$UPDATED_TARGETS"
+
+            echo "EventBridge target updated for $EVENTBRIDGE_RULE: $NEW_TASK_DEF_ARN"
+          fi
 
       # ── Chờ deployment hoàn thành ──────────────────────────────────────────
       - name: wait_for_deployment
@@ -130,8 +234,12 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           ECS_CLUSTER: ${{ secrets.ECS_CLUSTER_NAME }}
         run: |
-          echo "Waiting for ECS service ${{ matrix.service }} to stabilize..."
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "${{ matrix.service }}"
-          echo "Deployment stable: ${{ matrix.service }}"
+          if [ -n "$ECS_SERVICES" ]; then
+            echo "Waiting for ECS services to stabilize: $ECS_SERVICES"
+            aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services $ECS_SERVICES
+            echo "Deployment stable: $ECS_SERVICES"
+          else
+            echo "${{ matrix.service }} has no ECS service to wait for."
+          fi

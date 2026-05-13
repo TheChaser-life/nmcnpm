@@ -1160,13 +1160,14 @@ resource "aws_ecs_task_definition" "Tour_Producer_Task_Definition" {
                 { name = "AWS_REGION",              value = var.region },
                 { name = "IMAGE_DOWNLOAD_TIMEOUT",  value = "10" },
                 { name = "MAX_IMAGE_SIZE_BYTES",    value = "5242880" },
-                { name = "TRAVELPAYOUTS_API_TIMEOUT", value = "15" }
+                { name = "VIATOR_API_BASE_URL",       value = "https://api.viator.com/partner" },
+                { name = "VIATOR_API_TIMEOUT",        value = "15" }
             ]
 
             secrets = [
                 {
-                    name      = "TRAVELPAYOUTS_API_TOKEN"
-                    valueFrom = "arn:aws:secretsmanager:${var.region}:${var.account_id}:secret:nmcnpm/travelpayouts_api_key"
+                    name      = "VIATOR_API_KEY"
+                    valueFrom = var.viator_api_key_secret_arn
                 }
             ]
 

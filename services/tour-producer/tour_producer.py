@@ -20,6 +20,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import quote_plus, urlparse
 
 import boto3
 import requests
@@ -65,14 +66,14 @@ CURRENCY_COUNTRY_MAP: Dict[str, Tuple[str, str]] = {
 class Config:
     """Configuration loaded from environment variables."""
 
-    # Travelpayouts API
-    TRAVELPAYOUTS_API_TOKEN: str = os.environ.get("TRAVELPAYOUTS_API_TOKEN", "")
-    TRAVELPAYOUTS_API_BASE_URL: str = os.environ.get(
-        "TRAVELPAYOUTS_API_BASE_URL",
-        "https://api.travelpayouts.com/v1",
+    # Viator Partner API
+    VIATOR_API_KEY: str = os.environ.get("VIATOR_API_KEY", "")
+    VIATOR_API_BASE_URL: str = os.environ.get(
+        "VIATOR_API_BASE_URL",
+        "https://api.viator.com/partner",
     )
-    TRAVELPAYOUTS_API_TIMEOUT: int = int(
-        os.environ.get("TRAVELPAYOUTS_API_TIMEOUT", "15")
+    VIATOR_API_TIMEOUT: int = int(
+        os.environ.get("VIATOR_API_TIMEOUT", "15")
     )
     # Maximum tours to fetch per currency (to limit S3 storage and API quota)
     MAX_TOURS_PER_CURRENCY: int = int(
@@ -106,8 +107,8 @@ class Config:
     def validate(cls) -> None:
         """Validate required configuration. Raises ValueError on missing config."""
         errors: List[str] = []
-        if not cls.TRAVELPAYOUTS_API_TOKEN:
-            errors.append("TRAVELPAYOUTS_API_TOKEN is required")
+        if not cls.VIATOR_API_KEY:
+            errors.append("VIATOR_API_KEY is required")
         if not cls.S3_TOUR_BUCKET:
             errors.append("S3_TOUR_BUCKET is required")
         if errors:
@@ -148,32 +149,32 @@ def _build_session(retries: int = 3) -> requests.Session:
 
 # ── Travelpayouts API Client ──────────────────────────────────────────────────
 
-class TravelpayoutsClient:
+class ViatorClient:
     """
-    Client for the Travelpayouts Tours API.
+    Client for the Viator Partner API.
 
-    Travelpayouts provides a tours/activities search endpoint:
-      GET /v1/tours/search
-      Query params:
-        - destination: IATA city code or country code
-        - token: API token
-        - limit: max results
-        - currency: price currency (we use USD for consistency)
+    Viator provides a free-text product search endpoint:
+      POST /partner/search/freetext
 
-    Docs: https://support.travelpayouts.com/hc/en-us/articles/360004121072
+    Docs: https://docs.viator.com/partner-api/technical/
     """
 
     def __init__(self):
         self.session = _build_session()
         self.session.headers.update(
-            {"X-Access-Token": Config.TRAVELPAYOUTS_API_TOKEN}
+            {
+                "exp-api-key": Config.VIATOR_API_KEY,
+                "Accept": "application/json;version=2.0",
+                "Accept-Language": "en-US",
+                "Content-Type": "application/json",
+            }
         )
 
     def fetch_tours_for_country(
-        self, country_code: str, currency_code: str
+        self, country_code: str, country_name: str, currency_code: Optional[str] = None
     ) -> List[Dict]:
         """
-        Fetch tour listings for a given country from Travelpayouts.
+        Fetch tour listings for a given country from Viator.
 
         Args:
             country_code: ISO 3166-1 alpha-2 country code (e.g., "JP")
@@ -182,41 +183,55 @@ class TravelpayoutsClient:
         Returns:
             List of raw tour dicts from the API, or empty list on failure.
         """
-        url = f"{Config.TRAVELPAYOUTS_API_BASE_URL}/tours/search"
-        params = {
-            "destination": country_code,
-            "token": Config.TRAVELPAYOUTS_API_TOKEN,
-            "limit": Config.MAX_TOURS_PER_CURRENCY,
+        if currency_code is None:
+            currency_code = country_name
+            country_name = next(
+                (
+                    mapped_country_name
+                    for mapped_country_code, mapped_country_name in CURRENCY_COUNTRY_MAP.values()
+                    if mapped_country_code == country_code
+                ),
+                country_code,
+            )
+
+        url = f"{Config.VIATOR_API_BASE_URL}/search/freetext"
+        payload = {
+            "searchTerm": f"{country_name} tours",
             "currency": "USD",
+            "searchTypes": [
+                {
+                    "searchType": "PRODUCTS",
+                    "pagination": {
+                        "start": 1,
+                        "count": min(Config.MAX_TOURS_PER_CURRENCY, 50),
+                    },
+                }
+            ],
         }
 
         try:
             _log(
                 "INFO",
-                "Fetching tours from Travelpayouts API",
+                "Fetching tours from Viator API",
                 country_code=country_code,
+                country_name=country_name,
                 currency_code=currency_code,
                 url=url,
             )
-            response = self.session.get(
-                url, params=params, timeout=Config.TRAVELPAYOUTS_API_TIMEOUT
+            response = self.session.post(
+                url, json=payload, timeout=Config.VIATOR_API_TIMEOUT
             )
             response.raise_for_status()
             data = response.json()
 
-            # Travelpayouts returns either a list or {"data": [...]}
-            if isinstance(data, list):
-                tours = data
-            elif isinstance(data, dict) and "data" in data:
-                tours = data["data"]
-            else:
+            tours = self._extract_products(data)
+            if not tours:
                 _log(
                     "WARN",
                     "Unexpected API response structure",
                     country_code=country_code,
                     response_type=type(data).__name__,
                 )
-                tours = []
 
             _log(
                 "INFO",
@@ -230,10 +245,10 @@ class TravelpayoutsClient:
         except requests.exceptions.Timeout:
             _log(
                 "ERROR",
-                "Travelpayouts API request timed out",
+                "Viator API request timed out",
                 country_code=country_code,
                 currency_code=currency_code,
-                timeout=Config.TRAVELPAYOUTS_API_TIMEOUT,
+                timeout=Config.VIATOR_API_TIMEOUT,
                 timestamp=time.time(),
                 action="retaining_existing_s3_data",
             )
@@ -242,7 +257,7 @@ class TravelpayoutsClient:
         except requests.exceptions.HTTPError as exc:
             _log(
                 "ERROR",
-                "Travelpayouts API returned HTTP error",
+                "Viator API returned HTTP error",
                 country_code=country_code,
                 currency_code=currency_code,
                 status_code=exc.response.status_code if exc.response else None,
@@ -255,7 +270,7 @@ class TravelpayoutsClient:
         except requests.exceptions.RequestException as exc:
             _log(
                 "ERROR",
-                "Travelpayouts API request failed",
+                "Viator API request failed",
                 country_code=country_code,
                 currency_code=currency_code,
                 error=str(exc),
@@ -268,7 +283,7 @@ class TravelpayoutsClient:
         except (json.JSONDecodeError, ValueError) as exc:
             _log(
                 "ERROR",
-                "Failed to parse Travelpayouts API response as JSON",
+                "Failed to parse Viator API response as JSON",
                 country_code=country_code,
                 currency_code=currency_code,
                 error=str(exc),
@@ -276,6 +291,31 @@ class TravelpayoutsClient:
                 action="retaining_existing_s3_data",
             )
             return []
+
+    @staticmethod
+    def _extract_products(data) -> List[Dict]:
+        """Extract product summaries from supported Viator search response shapes."""
+        if isinstance(data, list):
+            return data
+        if not isinstance(data, dict):
+            return []
+
+        products = data.get("products")
+        if isinstance(products, dict):
+            results = products.get("results")
+            if isinstance(results, list):
+                return results
+        if isinstance(products, list):
+            return products
+
+        data_items = data.get("data")
+        if isinstance(data_items, list):
+            return data_items
+        return []
+
+
+# Backward-compatible alias for older tests/imports.
+TravelpayoutsClient = ViatorClient
 
 
 # ── Tour Data Normalizer ──────────────────────────────────────────────────────
@@ -317,7 +357,7 @@ class TourNormalizer:
         # ── Required fields ───────────────────────────────────────────────────
         name = self._extract_str(raw, ["name", "title", "tour_name"])
         affiliate_url = self._extract_str(
-            raw, ["affiliate_url", "url", "link", "booking_url"]
+            raw, ["affiliate_url", "productUrl", "url", "link", "booking_url"]
         )
 
         if not name or not affiliate_url:
@@ -329,16 +369,16 @@ class TourNormalizer:
             )
             return None
 
+        affiliate_url = self._normalize_affiliate_url(affiliate_url, name)
+
         # ── Optional fields ───────────────────────────────────────────────────
         description = self._extract_str(
-            raw, ["description", "short_description", "summary"], default=""
+            raw, ["description", "shortDescription", "short_description", "summary"], default=""
         )
         if description and len(description) > self.MAX_DESCRIPTION_LENGTH:
             description = description[: self.MAX_DESCRIPTION_LENGTH] + "…"
 
-        image_url = self._extract_str(
-            raw, ["image_url", "photo_url", "thumbnail_url", "cover_image"], default=""
-        )
+        image_url = self._extract_image_url(raw)
 
         # ── Stable ID: SHA-256 of affiliate_url (first 16 hex chars) ─────────
         tour_id = hashlib.sha256(affiliate_url.encode()).hexdigest()[:16]
@@ -380,6 +420,69 @@ class TourNormalizer:
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return default
+
+    @classmethod
+    def _extract_image_url(cls, data: Dict) -> str:
+        image_url = cls._extract_str(
+            data,
+            ["image_url", "photo_url", "thumbnail_url", "cover_image"],
+            default="",
+        )
+        if image_url:
+            return image_url
+
+        images = data.get("images")
+        if isinstance(images, list):
+            for image in images:
+                if not isinstance(image, dict):
+                    continue
+                variants = image.get("variants")
+                if isinstance(variants, list):
+                    for variant in variants:
+                        if isinstance(variant, dict):
+                            url = cls._extract_str(variant, ["url"], default="")
+                            if url:
+                                return url
+                url = cls._extract_str(image, ["url"], default="")
+                if url:
+                    return url
+
+        return ""
+
+    @staticmethod
+    def _normalize_affiliate_url(affiliate_url: str, tour_name: str) -> str:
+        """
+        Convert placeholder Viator URLs into durable search pages.
+
+        Viator product pages need a real product id. The fallback data used
+        product-like paths without ids, such as /tours/Kyoto/Kyoto-Walking-Tour,
+        which opens a 404 page.
+        """
+        affiliate_url = affiliate_url.strip()
+        parsed = urlparse(affiliate_url)
+        host = parsed.netloc.lower()
+        path_parts = [part for part in parsed.path.split("/") if part]
+
+        if host.endswith("viator.com") and path_parts:
+            search_text = ""
+
+            if path_parts[0] == "search" and len(path_parts) >= 2:
+                search_text = " ".join(path_parts[1:]).replace("-", " ")
+            elif (
+                path_parts[0] == "tours"
+                and len(path_parts) == 3
+                and not any(char.isdigit() for char in path_parts[2])
+            ):
+                city = path_parts[1].replace("-", " ")
+                if city.lower() in tour_name.lower():
+                    search_text = tour_name.strip()
+                else:
+                    search_text = f"{city} {tour_name}".strip()
+
+            if search_text:
+                return f"https://www.viator.com/searchResults/all?text={quote_plus(search_text)}"
+
+        return affiliate_url
 
 
 # ── Image Downloader ──────────────────────────────────────────────────────────
@@ -585,7 +688,7 @@ class TourProducer:
     """
 
     def __init__(self):
-        self.api_client = TravelpayoutsClient()
+        self.api_client = ViatorClient()
         self.normalizer = TourNormalizer()
         self.image_downloader = ImageDownloader()
         self.s3_uploader = S3Uploader()
@@ -609,7 +712,9 @@ class TourProducer:
         country_code, country_name = country_info
 
         # ── Step 1: Fetch raw tours from API ──────────────────────────────────
-        raw_tours = self.api_client.fetch_tours_for_country(country_code, currency_code)
+        raw_tours = self.api_client.fetch_tours_for_country(
+            country_code, country_name, currency_code
+        )
 
         # ── Fallback: If API fails, use high-quality simulated data ───────────
         if not raw_tours:

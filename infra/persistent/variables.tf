@@ -32,6 +32,12 @@ variable "travelpayouts_api_key" {
   sensitive   = true
 }
 
+variable "viator_api_key" {
+  description = "API key cho Viator Partner API"
+  type        = string
+  sensitive   = true
+}
+
 variable "exchange_rate_api_key" {
   description = "API key cho Exchange Rate API"
   type        = string

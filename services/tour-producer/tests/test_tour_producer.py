@@ -26,7 +26,7 @@ with patch("boto3.client"):
         ImageDownloader,
         TourNormalizer,
         TourProducer,
-        TravelpayoutsClient,
+        ViatorClient,
     )
 
 
@@ -152,6 +152,49 @@ class TestTourNormalizer(unittest.TestCase):
 
         self.assertEqual(result["image_url"], "https://cdn.example.com/photo.jpg")
 
+    def test_normalize_uses_viator_product_fields(self):
+        """Viator product summary fields are accepted."""
+        raw = {
+            "title": "Tokyo City Highlights",
+            "shortDescription": "See the best of Tokyo.",
+            "productUrl": "https://www.viator.com/tours/Tokyo/d334-12345P1",
+            "images": [
+                {
+                    "variants": [
+                        {"url": "https://media.example.com/tokyo-small.jpg"},
+                        {"url": "https://media.example.com/tokyo-large.jpg"},
+                    ]
+                }
+            ],
+        }
+        result = self._normalize(raw)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Tokyo City Highlights")
+        self.assertEqual(result["description"], "See the best of Tokyo.")
+        self.assertEqual(result["affiliate_url"], "https://www.viator.com/tours/Tokyo/d334-12345P1")
+        self.assertEqual(result["image_url"], "https://media.example.com/tokyo-small.jpg")
+
+    def test_normalize_rewrites_placeholder_viator_tour_url(self):
+        """Viator product-like URLs without product ids are rewritten to search."""
+        raw = {
+            "name": "Kyoto Cultural Immersion",
+            "affiliate_url": "https://www.viator.com/tours/Kyoto/Kyoto-Walking-Tour",
+        }
+        result = self._normalize(raw)
+
+        self.assertEqual(
+            result["affiliate_url"],
+            "https://www.viator.com/searchResults/all?text=Kyoto+Cultural+Immersion",
+        )
+
+    def test_normalize_keeps_non_viator_affiliate_url(self):
+        """Non-Viator affiliate URLs are left unchanged."""
+        raw = {"name": "Tour", "affiliate_url": "https://tp.media/r?id=abc"}
+        result = self._normalize(raw)
+
+        self.assertEqual(result["affiliate_url"], "https://tp.media/r?id=abc")
+
     # ── Missing required fields ───────────────────────────────────────────────
 
     def test_returns_none_when_name_missing(self):
@@ -192,14 +235,14 @@ class TestTourNormalizer(unittest.TestCase):
 
 # ── TravelpayoutsClient response parsing tests ────────────────────────────────
 
-class TestTravelpayoutsClientParsing(unittest.TestCase):
+class TestViatorClientParsing(unittest.TestCase):
     """Tests for TravelpayoutsClient.fetch_tours_for_country() response parsing."""
 
     def setUp(self):
         # Patch the session so no real HTTP calls are made
         with patch("tour_producer._build_session") as mock_build:
             mock_build.return_value = MagicMock()
-            self.client = TravelpayoutsClient()
+            self.client = ViatorClient()
         self.client.session = MagicMock()
 
     def _mock_response(self, data, status_code=200):
@@ -212,16 +255,16 @@ class TestTravelpayoutsClientParsing(unittest.TestCase):
     def test_parses_list_response(self):
         """API returning a plain list is handled correctly."""
         tours = [{"name": "Tour A", "affiliate_url": "https://tp.media/r?id=1"}]
-        self.client.session.get.return_value = self._mock_response(tours)
+        self.client.session.post.return_value = self._mock_response(tours)
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
         self.assertEqual(result, tours)
 
-    def test_parses_dict_with_data_key(self):
-        """API returning {'data': [...]} is unwrapped correctly."""
+    def test_parses_dict_with_products_results(self):
+        """API returning {'products': {'results': [...]}} is unwrapped correctly."""
         tours = [{"name": "Tour B", "affiliate_url": "https://tp.media/r?id=2"}]
-        self.client.session.get.return_value = self._mock_response({"data": tours})
+        self.client.session.post.return_value = self._mock_response({"products": {"results": tours}})
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
@@ -229,7 +272,7 @@ class TestTravelpayoutsClientParsing(unittest.TestCase):
 
     def test_returns_empty_list_for_unexpected_structure(self):
         """Unexpected response structure returns empty list (no exception)."""
-        self.client.session.get.return_value = self._mock_response({"unexpected": True})
+        self.client.session.post.return_value = self._mock_response({"unexpected": True})
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
@@ -238,7 +281,7 @@ class TestTravelpayoutsClientParsing(unittest.TestCase):
     def test_returns_empty_list_on_timeout(self):
         """Timeout exception returns empty list and does not raise."""
         import requests as req
-        self.client.session.get.side_effect = req.exceptions.Timeout()
+        self.client.session.post.side_effect = req.exceptions.Timeout()
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
@@ -250,7 +293,7 @@ class TestTravelpayoutsClientParsing(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         http_error = req.exceptions.HTTPError(response=mock_resp)
-        self.client.session.get.side_effect = http_error
+        self.client.session.post.side_effect = http_error
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
@@ -261,7 +304,7 @@ class TestTravelpayoutsClientParsing(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.side_effect = json.JSONDecodeError("err", "", 0)
-        self.client.session.get.return_value = mock_resp
+        self.client.session.post.return_value = mock_resp
 
         result = self.client.fetch_tours_for_country("JP", "JPY")
 
@@ -283,16 +326,18 @@ class TestTourProducerProcessCurrency(unittest.TestCase):
         producer.s3_uploader = MagicMock()
         return producer
 
-    def test_returns_api_empty_when_no_tours_fetched(self):
-        """When API returns empty list, status is 'api_empty' and S3 is not written."""
+    def test_uses_fallback_tours_when_no_tours_fetched(self):
+        """When API returns empty list, fallback tours are uploaded."""
         producer = self._make_producer()
         producer.api_client.fetch_tours_for_country.return_value = []
+        producer.image_downloader.download.return_value = None
 
         result = producer._process_currency("JPY")
 
-        self.assertEqual(result["status"], "api_empty")
-        self.assertEqual(result["fetched"], 0)
-        producer.s3_uploader.upload_tour_json.assert_not_called()
+        self.assertEqual(result["status"], "success")
+        self.assertGreater(result["fetched"], 0)
+        self.assertGreater(result["uploaded"], 0)
+        producer.s3_uploader.upload_tour_json.assert_called()
         producer.s3_uploader.upload_tour_image.assert_not_called()
 
     def test_returns_skipped_for_unknown_currency(self):
@@ -401,17 +446,17 @@ class TestConfig(unittest.TestCase):
         """validate() raises ValueError when TRAVELPAYOUTS_API_TOKEN is empty."""
         with patch.dict(
             os.environ,
-            {"TRAVELPAYOUTS_API_TOKEN": "", "S3_TOUR_BUCKET": "my-bucket"},
+            {"VIATOR_API_KEY": "", "S3_TOUR_BUCKET": "my-bucket"},
         ):
-            Config.TRAVELPAYOUTS_API_TOKEN = ""
+            Config.VIATOR_API_KEY = ""
             Config.S3_TOUR_BUCKET = "my-bucket"
             with self.assertRaises(ValueError) as ctx:
                 Config.validate()
-            self.assertIn("TRAVELPAYOUTS_API_TOKEN", str(ctx.exception))
+            self.assertIn("VIATOR_API_KEY", str(ctx.exception))
 
     def test_validate_raises_when_bucket_missing(self):
         """validate() raises ValueError when S3_TOUR_BUCKET is empty."""
-        Config.TRAVELPAYOUTS_API_TOKEN = "token123"
+        Config.VIATOR_API_KEY = "token123"
         Config.S3_TOUR_BUCKET = ""
         with self.assertRaises(ValueError) as ctx:
             Config.validate()

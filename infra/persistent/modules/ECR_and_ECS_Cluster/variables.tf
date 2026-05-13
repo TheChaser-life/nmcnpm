@@ -118,6 +118,12 @@ variable "premium_fee_parameter_arn" {
     default     = ""
 }
 
+variable "viator_api_key_secret_arn" {
+    description = "ARN of the Secrets Manager secret containing Viator API key"
+    type        = string
+    default     = ""
+}
+
 variable "Forecast_Exchange_Rate_Image_URI" {
     type    = string
     default = ""

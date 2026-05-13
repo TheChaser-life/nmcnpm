@@ -22,6 +22,10 @@ variable "travelpayouts_api_key" {
     type = string
 }
 
+variable "viator_api_key" {
+    type = string
+}
+
 variable "exchange_rate_api_key" {
     type = string
 }

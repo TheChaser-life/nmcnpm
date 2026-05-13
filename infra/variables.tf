@@ -83,6 +83,12 @@ variable "travelpayouts_api_key" {
 
 # ── Business Config ───────────────────────────────────────────────────────────
 
+variable "viator_api_key" {
+  description = "API key cho Viator Partner API (tour data) - luu vao Secrets Manager"
+  type        = string
+  sensitive   = true
+}
+
 variable "premium_fee" {
   description = "Phí nâng cấp Premium tính bằng VND giả lập — lưu vào SSM Parameter Store"
   type        = string

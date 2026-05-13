@@ -17,6 +17,7 @@ import json
 import os
 import sys
 from typing import Dict, List, Optional
+from urllib.parse import quote_plus, urlparse
 
 import boto3
 import botocore.exceptions
@@ -34,6 +35,43 @@ def _log(level: str, message: str, **kwargs) -> None:
         **kwargs,
     }
     print(json.dumps(entry, default=str), flush=True)
+
+
+def _normalize_affiliate_url(affiliate_url: str, tour_name: str) -> str:
+    """
+    Convert legacy placeholder Viator URLs into durable search pages.
+
+    Older tour JSON can contain product-like Viator paths without a product id,
+    for example /tours/Kyoto/Kyoto-Walking-Tour. Viator returns 404 for those.
+    """
+    if not isinstance(affiliate_url, str):
+        return ""
+
+    affiliate_url = affiliate_url.strip()
+    parsed = urlparse(affiliate_url)
+    host = parsed.netloc.lower()
+    path_parts = [part for part in parsed.path.split("/") if part]
+
+    if host.endswith("viator.com") and path_parts:
+        search_text = ""
+
+        if path_parts[0] == "search" and len(path_parts) >= 2:
+            search_text = " ".join(path_parts[1:]).replace("-", " ")
+        elif (
+            path_parts[0] == "tours"
+            and len(path_parts) == 3
+            and not any(char.isdigit() for char in path_parts[2])
+        ):
+            city = path_parts[1].replace("-", " ")
+            if city.lower() in tour_name.lower():
+                search_text = tour_name.strip()
+            else:
+                search_text = f"{city} {tour_name}".strip()
+
+        if search_text:
+            return f"https://www.viator.com/searchResults/all?text={quote_plus(search_text)}"
+
+    return affiliate_url
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -299,6 +337,11 @@ def create_app(s3_reader: Optional[S3TourReader] = None) -> Flask:
             if tour is None:
                 # read_tour already logged the reason (not found or invalid JSON)
                 continue
+
+            tour["affiliate_url"] = _normalize_affiliate_url(
+                tour.get("affiliate_url", ""),
+                tour.get("name", ""),
+            )
 
             # Generate pre-signed URL for the image if an image_key is present
             image_key = tour.get("image_key", "")

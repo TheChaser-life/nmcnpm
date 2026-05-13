@@ -81,6 +81,7 @@ module "Secrets_Manager_and_Parameter_Store" {
   rotate_redis_password_lambda_function_arn  = module.ECR_and_ECS_Cluster.rotate_redis_lambda_function_arn
 
   travelpayouts_api_key = var.travelpayouts_api_key
+  viator_api_key        = var.viator_api_key
   exchange_rate_api_key = var.exchange_rate_api_key
   premium_fee           = var.premium_fee
 }

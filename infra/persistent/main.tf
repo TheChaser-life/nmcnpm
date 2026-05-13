@@ -86,6 +86,7 @@ module "ECR_and_ECS_Cluster" {
   rds_secret_arn            = module.Secrets_Manager_and_Parameter_Store.rds_secret_arn
   elasticache_secret_arn    = module.Secrets_Manager_and_Parameter_Store.elasticache_secret_arn
   premium_fee_parameter_arn = module.Secrets_Manager_and_Parameter_Store.premium_fee_parameter_arn
+  viator_api_key_secret_arn = module.Secrets_Manager_and_Parameter_Store.viator_api_key_secret_arn
 
   # RDS
   db_host = var.db_host
@@ -109,6 +110,7 @@ module "Secrets_Manager_and_Parameter_Store" {
   rotate_redis_password_lambda_function_arn  = var.rotate_redis_password_lambda_function_arn
 
   travelpayouts_api_key = var.travelpayouts_api_key
+  viator_api_key        = var.viator_api_key
   exchange_rate_api_key = var.exchange_rate_api_key
   premium_fee           = var.premium_fee
 }
