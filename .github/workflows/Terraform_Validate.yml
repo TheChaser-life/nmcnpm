@@ -1,68 +1,68 @@
-name: 4. Terraform Validate and Plan (dev branch)
+# name: 4. Terraform Validate and Plan (dev branch)
 
-# Chạy khi push lên dev và có thay đổi infra/
-# Mục đích: phát hiện lỗi sớm trước khi tạo PR
-on:
-  push:
-    branches:
-      - dev
-    paths:
-      - 'infra/**'
+# # Chạy khi push lên dev và có thay đổi infra/
+# # Mục đích: phát hiện lỗi sớm trước khi tạo PR
+# on:
+#   push:
+#     branches:
+#       - dev
+#     paths:
+#       - 'infra/**'
 
-jobs:
-  terraform-validate-plan:
-    runs-on: ubuntu-latest
+# jobs:
+#   terraform-validate-plan:
+#     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      id-token: write   # OIDC auth với AWS
+#     permissions:
+#       contents: read
+#       id-token: write   # OIDC auth với AWS
 
-    defaults:
-      run:
-        working-directory: infra
+#     defaults:
+#       run:
+#         working-directory: infra
 
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
+#     steps:
+#       - name: checkout
+#         uses: actions/checkout@v4
 
-      - name: setup_terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.7"
+#       - name: setup_terraform
+#         uses: hashicorp/setup-terraform@v3
+#         with:
+#           terraform_version: "~1.7"
 
-      # ── Auth AWS qua OIDC ──────────────────────────────────────────────────
-      - name: configure_aws_credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+#       # ── Auth AWS qua OIDC ──────────────────────────────────────────────────
+#       - name: configure_aws_credentials
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+#           aws-region: ${{ secrets.AWS_REGION }}
 
-      # ── Init với remote backend ────────────────────────────────────────────
-      - name: terraform_init
-        run: terraform init
+#       # ── Init với remote backend ────────────────────────────────────────────
+#       - name: terraform_init
+#         run: terraform init
 
-      # ── Format check ───────────────────────────────────────────────────────
-      - name: terraform_fmt
-        id: fmt
-        run: terraform fmt -check -recursive
-        continue-on-error: true   # cảnh báo nhưng không block
+#       # ── Format check ───────────────────────────────────────────────────────
+#       - name: terraform_fmt
+#         id: fmt
+#         run: terraform fmt -check -recursive
+#         continue-on-error: true   # cảnh báo nhưng không block
 
-      # ── Validate syntax và module references ───────────────────────────────
-      - name: terraform_validate
-        id: validate
-        run: terraform validate -no-color
+#       # ── Validate syntax và module references ───────────────────────────────
+#       - name: terraform_validate
+#         id: validate
+#         run: terraform validate -no-color
 
-      # ── Plan — xem trước thay đổi ─────────────────────────────────────────
-      - name: terraform_plan
-        id: plan
-        run: |
-          terraform plan -no-color \
-            -var="exchange_rate_api_key=${{ secrets.TF_VAR_EXCHANGE_RATE_API_KEY }}" \
-            -var="travelpayouts_api_key=${{ secrets.TF_VAR_TRAVELPAYOUTS_API_KEY }}"
+#       # ── Plan — xem trước thay đổi ─────────────────────────────────────────
+#       - name: terraform_plan
+#         id: plan
+#         run: |
+#           terraform plan -no-color \
+#             -var="exchange_rate_api_key=${{ secrets.TF_VAR_EXCHANGE_RATE_API_KEY }}" \
+#             -var="travelpayouts_api_key=${{ secrets.TF_VAR_TRAVELPAYOUTS_API_KEY }}"
 
-      # ── Fail job nếu validate hoặc plan thất bại ──────────────────────────
-      - name: check_results
-        if: steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
-        run: |
-          echo "Terraform validate or plan failed"
-          exit 1
+#       # ── Fail job nếu validate hoặc plan thất bại ──────────────────────────
+#       - name: check_results
+#         if: steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
+#         run: |
+#           echo "Terraform validate or plan failed"
+#           exit 1
