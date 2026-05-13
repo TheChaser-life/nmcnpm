@@ -501,4 +501,3 @@ resource "aws_iam_policy" "eventbridge_sfn_policy" {
     name   = "nmcnpm-eventbridge-sfn-policy"
     policy = data.aws_iam_policy_document.eventbridge_sfn_policy_document.json
 }
-
