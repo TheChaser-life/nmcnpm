@@ -1,4 +1,4 @@
-name: 3. Push to ECR and Deploy to ECS (main branch)
+name: 3. Push to ECR and Deploy to ECS 
 
 # Chạy sau khi PR được merge vào main
 # Lúc này code đã qua: SonarQube scan + Trivy scan + review → an toàn để deploy

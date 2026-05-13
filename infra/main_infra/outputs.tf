@@ -9,6 +9,11 @@ output "ecs_services_sg_id" {
   value       = module.VPC_and_Networking.ecs_services_sg_id
 }
 
+output "public_subnet_ids" {
+  description = "Public subnet IDs used by ALB and public ECS/Fargate tasks"
+  value       = module.VPC_and_Networking.public_subnet_ids
+}
+
 # ── ElastiCache (Redis/Valkey) ────────────────────────────────────────────────
 output "redis_host" {
   description = "Redis host (trỏ về exchange rate cluster để tương thích code cũ)"
