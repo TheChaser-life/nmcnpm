@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
+# Copy only requirements first to leverage Docker cache.
 COPY requirements.txt .
 
 # Install dependencies to /usr/local (default pip install location)
@@ -51,3 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Run the forecast service
 CMD ["python", "-u", "forecast_service.py"]
+# CI/CD smoke test marker.

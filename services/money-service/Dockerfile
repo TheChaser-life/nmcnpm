@@ -12,7 +12,7 @@ WORKDIR /app
 # Copy only requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install dependencies to /usr/local (default pip install location)
+# Install dependencies to /usr/local (default pip install location).
 RUN pip install --no-cache-dir --timeout 300 --retries 5 -r requirements.txt
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
@@ -51,3 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Run the money service
 CMD ["python", "-u", "money_service.py"]
+# CI/CD smoke test marker.

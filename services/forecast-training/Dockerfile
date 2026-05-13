@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
+# Copy only requirements first to leverage Docker cache.
 COPY requirements.txt .
 
 # Install dependencies to /usr/local (default pip install location)
@@ -83,3 +83,4 @@ EXPOSE 8080
 
 # SageMaker starts training with "train" and hosting with "serve".
 ENTRYPOINT ["/opt/program/entrypoint"]
+# CI/CD smoke test marker.

@@ -11,7 +11,7 @@ COPY . .
 
 RUN npm run build
 
-# ── Stage 2: Runner ─────────────────────────────────────────────────────────
+# ── Stage 2: Runner. ─────────────────────────────────────────────────────────
 FROM node:20-alpine
 
 ENV NODE_ENV=production
@@ -27,3 +27,4 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 4000
 
 CMD ["node", "dist/server.js"]
+# CI/CD smoke test marker.

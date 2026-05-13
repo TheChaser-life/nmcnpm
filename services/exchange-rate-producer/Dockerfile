@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
+# Copy only requirements first to leverage Docker cache.
 COPY requirements.txt .
 
 # Install dependencies to /usr/local (default pip install location)
@@ -46,3 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the producer service
 CMD ["python", "-u", "producer.py"]
+# CI/CD smoke test marker.

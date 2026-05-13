@@ -131,6 +131,14 @@ jobs:
       - name: build_image
         env:
           ECR_REGISTRY: ${{ steps.ecr_login.outputs.registry }}
+          VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
+          VITE_AWS_REGION: ${{ secrets.AWS_REGION }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_STREAMING_SERVICE_URL: ${{ secrets.VITE_STREAMING_SERVICE_URL }}
+          VITE_MONEY_SERVICE_URL: ${{ secrets.VITE_MONEY_SERVICE_URL }}
+          VITE_FORECAST_SERVICE_URL: ${{ secrets.VITE_FORECAST_SERVICE_URL }}
+          VITE_TOUR_SERVICE_URL: ${{ secrets.VITE_TOUR_SERVICE_URL }}
         run: |
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
           BRANCH_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:main"
@@ -142,11 +150,26 @@ jobs:
           # --build-arg BUILDKIT_INLINE_CACHE=1 để embed metadata cache vào image, giúp cache hiệu quả hơn ở lần build sau
           docker pull "$BRANCH_IMAGE_URI" || true
 
+          BUILD_ARGS=(--build-arg BUILDKIT_INLINE_CACHE=1)
+
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            BUILD_ARGS+=(
+              --build-arg "VITE_COGNITO_USER_POOL_ID=$VITE_COGNITO_USER_POOL_ID"
+              --build-arg "VITE_COGNITO_CLIENT_ID=$VITE_COGNITO_CLIENT_ID"
+              --build-arg "VITE_AWS_REGION=$VITE_AWS_REGION"
+              --build-arg "VITE_API_BASE_URL=$VITE_API_BASE_URL"
+              --build-arg "VITE_STREAMING_SERVICE_URL=$VITE_STREAMING_SERVICE_URL"
+              --build-arg "VITE_MONEY_SERVICE_URL=$VITE_MONEY_SERVICE_URL"
+              --build-arg "VITE_FORECAST_SERVICE_URL=$VITE_FORECAST_SERVICE_URL"
+              --build-arg "VITE_TOUR_SERVICE_URL=$VITE_TOUR_SERVICE_URL"
+            )
+          fi
+
           docker build \
             --tag "$IMAGE_URI" \
             --tag "$BRANCH_IMAGE_URI" \
             --cache-from "$BRANCH_IMAGE_URI" \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            "${BUILD_ARGS[@]}" \
             "services/${{ matrix.service }}"
 
       # ── Push lên ECR ───────────────────────────────────────────────────────

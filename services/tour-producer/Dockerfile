@@ -12,7 +12,7 @@ WORKDIR /app
 # Copy only requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install dependencies to /usr/local (default pip install location)
+# Install dependencies to /usr/local (default pip install location).
 RUN pip install --no-cache-dir --timeout 300 --retries 5 -r requirements.txt
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
@@ -46,3 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run as a one-shot task (ECS will stop the container after this exits)
 CMD ["python", "-u", "tour_producer.py"]
+# CI/CD smoke test marker.
