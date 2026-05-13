@@ -63,6 +63,7 @@ jobs:
 
       - name: resolve_deploy_targets
         # Ứng với mỗi service sẽ có các biến môi trường khác nhau như ECR_REPOSITORY, TASK_DEFINITION, CONTAINER_NAME, ECS_SERVICES, EVENTBRIDGE_RULE... để tái sử dụng chung code deploy ở bước sau, tránh hardcode nhiều chỗ và dễ bảo trì khi thêm/sửa service
+        # Các task chạy theo lịch không có ECS service vì không phải là long-running service
         run: |
           case "${{ matrix.service }}" in
             exchange-rate-producer)
@@ -93,7 +94,6 @@ jobs:
               echo "ECR_REPOSITORY=tour_producer_repo" >> $GITHUB_ENV
               echo "TASK_DEFINITION=Tour_Producer_Task" >> $GITHUB_ENV
               echo "CONTAINER_NAME=Tour_Producer_Container" >> $GITHUB_ENV
-              echo "ECS_SERVICES=" >> $GITHUB_ENV
               echo "EVENTBRIDGE_RULE=scheduled_tour_producer_task" >> $GITHUB_ENV
               echo "EVENTBRIDGE_TARGET_ID=scheduled_tour_producer_target" >> $GITHUB_ENV
               ;;
@@ -102,24 +102,17 @@ jobs:
               echo "TASK_DEFINITION=Tour_Service_Task" >> $GITHUB_ENV
               echo "CONTAINER_NAME=Tour_Service_Container" >> $GITHUB_ENV
               echo "ECS_SERVICES=Tour_Service" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
               ;;
             dataset-maker)
               echo "ECR_REPOSITORY=dataset_maker_repo" >> $GITHUB_ENV
               echo "TASK_DEFINITION=Dataset_Maker_Task_Definition" >> $GITHUB_ENV
               echo "CONTAINER_NAME=Dataset_Maker_Container" >> $GITHUB_ENV
-              echo "ECS_SERVICES=" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
               ;;
             frontend)
               echo "ECR_REPOSITORY=frontend_repo" >> $GITHUB_ENV
               echo "TASK_DEFINITION=Frontend_Task" >> $GITHUB_ENV
               echo "CONTAINER_NAME=Frontend_Container" >> $GITHUB_ENV
               echo "ECS_SERVICES=Frontend_Service" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_RULE=" >> $GITHUB_ENV
-              echo "EVENTBRIDGE_TARGET_ID=" >> $GITHUB_ENV
               ;;
             *)
               echo "Unknown service: ${{ matrix.service }}" >&2
@@ -129,6 +122,7 @@ jobs:
 
       # ── Build image với tag commit SHA ─────────────────────────────────────
       - name: build_image
+        # Registry và các biến môi trường cho frontend vite để đưa vào lúc build image, frontend vite là static app nên không nhận biến lúc runtime
         env:
           ECR_REGISTRY: ${{ steps.ecr_login.outputs.registry }}
           VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
@@ -140,8 +134,9 @@ jobs:
           VITE_FORECAST_SERVICE_URL: ${{ secrets.VITE_FORECAST_SERVICE_URL }}
           VITE_TOUR_SERVICE_URL: ${{ secrets.VITE_TOUR_SERVICE_URL }}
         run: |
+          # một tag là commit SHA để đánh dấu các version code phục vụ rollback, một tag là latest để tận dụng cache khi build lần sau, tránh phải build lại từ đầu nếu không có thay đổi lớn
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
-          BRANCH_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:main"
+          BRANCH_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
           echo "BRANCH_IMAGE_URI=$BRANCH_IMAGE_URI" >> $GITHUB_ENV
           echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
@@ -233,12 +228,24 @@ jobs:
           fi
 
           if [ -n "$EVENTBRIDGE_RULE" ]; then
+            echo "Updating EventBridge target $EVENTBRIDGE_TARGET_ID on rule $EVENTBRIDGE_RULE"
+
             TARGET=$(aws events list-targets-by-rule \
               --rule "$EVENTBRIDGE_RULE" \
               --query "Targets[?Id=='$EVENTBRIDGE_TARGET_ID'] | [0]" \
               --output json)
 
-            echo "$TARGET" | jq -e '.Id' > /dev/null
+            if [ "$TARGET" = "null" ] || ! echo "$TARGET" | jq -e '.Id' > /dev/null; then
+              echo "EventBridge target not found."
+              echo "Rule: $EVENTBRIDGE_RULE"
+              echo "Expected target id: $EVENTBRIDGE_TARGET_ID"
+              echo "Existing targets:"
+              aws events list-targets-by-rule \
+                --rule "$EVENTBRIDGE_RULE" \
+                --query 'Targets[].Id' \
+                --output table
+              exit 1
+            fi
 
             UPDATED_TARGETS=$(echo "$TARGET" | jq \
               --arg TASK_DEF_ARN "$NEW_TASK_DEF_ARN" \
