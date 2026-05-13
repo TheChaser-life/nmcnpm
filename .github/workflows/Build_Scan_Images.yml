@@ -1,4 +1,4 @@
-name: 2. Build, Test and Scan images (dev branch)
+name: 2. Build, Test and Scan images 
 
 # Chạy trên dev — chỉ build, test, scan Trivy
 # KHÔNG push lên ECR — push sẽ xảy ra sau khi merge vào main (workflow 3)

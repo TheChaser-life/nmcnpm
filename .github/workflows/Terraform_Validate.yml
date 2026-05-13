@@ -1,4 +1,4 @@
-name: 4. Terraform Validate and Plan (dev branch)
+name: 4. Terraform Validate and Plan 
 
 # Chạy khi push lên dev và có thay đổi infra/
 # Mục đích: phát hiện lỗi sớm trước khi tạo PR

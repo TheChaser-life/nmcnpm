@@ -1,4 +1,4 @@
-name: 5. Terraform Apply (after merge to main)
+name: 5. Terraform Apply 
 
 # Chạy sau khi PR được merge vào main và có thay đổi infra/
 # Lúc này code đã qua: validate trên dev + review + approve → an toàn để apply
