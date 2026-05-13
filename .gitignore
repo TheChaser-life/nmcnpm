@@ -1,0 +1,94 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# Vite
+services/frontend/dist/
+
+# Environment files (never commit real values)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfvars
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# terraform.tfvars may contain secrets — keep example, ignore real values
+# Uncomment the line below if tfvars contains secrets and you use a separate
+# secrets file. Currently tracked because it holds non-secret config.
+# infra/terraform.tfvars
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.dockerignore
+
+# ── AWS / Secrets ─────────────────────────────────────────────────────────────
+*.pem
+*.key
+credentials
+.aws/
+aws*
+aws/
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.kiro/
+skills/
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+tmp/
+temp/
+
+# Script
+initiate_terraform_backend.sh
+scratch/
+
+# Error logs
+error_logs/

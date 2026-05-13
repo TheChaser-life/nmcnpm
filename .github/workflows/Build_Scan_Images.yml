@@ -1,0 +1,99 @@
+name: 2. Build, Test and Scan images (dev branch)
+
+# Chạy trên dev — chỉ build, test, scan Trivy
+# KHÔNG push lên ECR — push sẽ xảy ra sau khi merge vào main (workflow 3)
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'services/**'
+
+jobs:
+  # ── Job 1: Phát hiện service nào thay đổi ──────────────────────────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            exchange-rate-producer: 'services/exchange-rate-producer/**'
+            streaming-service:      'services/streaming-service/**'
+            money-service:          'services/money-service/**'
+            forecast-service:       'services/forecast-service/**'
+            tour-producer:          'services/tour-producer/**'
+            tour-service:           'services/tour-service/**'
+            dataset-maker:          'services/dataset-maker/**'
+            frontend:               'services/frontend/**'
+
+  # ── Job 2: Build → Test → Trivy scan (không push) ─────────────────────────
+  build-test-scan:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF lên GitHub Security tab
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      # ── Build image locally (không cần ECR login) ──────────────────────────
+      - name: build_image
+        run: |
+          IMAGE_URI="local/${{ matrix.service }}:${{ github.sha }}"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+          docker build \
+            --tag "$IMAGE_URI" \
+            "services/${{ matrix.service }}"
+
+      # ── Chạy unit tests (Python services) ─────────────────────────────────
+      - name: run_tests
+        if: |
+          matrix.service != 'frontend' &&
+          matrix.service != 'streaming-service'
+        run: |
+          # Chạy tests bên trong container vừa build
+          docker run --rm \
+            --entrypoint "" \
+            "$IMAGE_URI" \
+            sh -c "pip install pytest pytest-cov --quiet && \
+                   pytest tests/ -q --tb=short \
+                   --cov=. --cov-report=xml:/tmp/coverage.xml || true"
+
+          # Copy coverage report ra host
+          CONTAINER_ID=$(docker create "$IMAGE_URI")
+          docker cp "$CONTAINER_ID:/tmp/coverage.xml" \
+            "coverage-${{ matrix.service }}.xml" 2>/dev/null || true
+          docker rm "$CONTAINER_ID"
+
+      # ── Trivy scan — pipeline fail nếu có CRITICAL/HIGH ───────────────────
+      - name: trivy_scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_URI }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: upload_trivy_sarif
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}

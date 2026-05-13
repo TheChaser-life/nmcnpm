@@ -1,0 +1,8 @@
+# Runtime dependencies cho Post-Confirmation Lambda
+# boto3 thường đã có sẵn trong Lambda runtime, nhưng pin version để đảm bảo tính nhất quán
+boto3==1.34.69
+botocore==1.34.69
+
+# psycopg2-binary: PostgreSQL adapter cho Python
+# Dùng bản binary để không cần build từ source (phù hợp với Lambda packaging)
+psycopg2-binary==2.9.9

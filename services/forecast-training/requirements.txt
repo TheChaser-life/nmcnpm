@@ -1,0 +1,15 @@
+# ML dependencies
+xgboost==2.1.1
+scikit-learn==1.5.2
+pandas==2.2.3
+numpy==1.26.4
+
+# Inference server
+flask==3.0.3
+gunicorn==23.0.0
+
+# AWS SDK
+boto3==1.35.36
+
+# Utilities
+python-dateutil==2.9.0
