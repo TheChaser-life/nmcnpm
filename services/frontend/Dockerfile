@@ -32,7 +32,7 @@ ENV VITE_MONEY_SERVICE_URL=$VITE_MONEY_SERVICE_URL
 ENV VITE_FORECAST_SERVICE_URL=$VITE_FORECAST_SERVICE_URL
 ENV VITE_TOUR_SERVICE_URL=$VITE_TOUR_SERVICE_URL
 
-# Debug: show the env vars before build
+# Debug: show the env vars before build.
 RUN echo "Build environment:" && \
     echo "VITE_COGNITO_USER_POOL_ID=${VITE_COGNITO_USER_POOL_ID}" && \
     echo "VITE_COGNITO_CLIENT_ID=${VITE_COGNITO_CLIENT_ID}" && \
@@ -47,7 +47,7 @@ RUN npm run build
 # ── Stage 2: Serve ────────────────────────────────────────────────────────────
 FROM nginx:1.25-alpine AS production
 
-# Copy built assets from builder stage
+# Copy built assets from builder stage.
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy custom nginx configuration for SPA routing

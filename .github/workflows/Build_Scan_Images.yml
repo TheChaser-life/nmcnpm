@@ -70,7 +70,7 @@ jobs:
 
       # ── Trivy scan — pipeline fail nếu có CRITICAL/HIGH ───────────────────
       - name: trivy_scan
-        continues-on-error: true # Đảm bảo job không fail ngay cả khi phát hiện vulnerabilities, để có thể upload kết quả scan lên GitHub Security tab
+        continue-on-error: true # Đảm bảo job không fail ngay cả khi phát hiện vulnerabilities, để có thể upload kết quả scan lên GitHub Security tab
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_URI }}
