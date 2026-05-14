@@ -1,6 +1,8 @@
 # Architecture
 
-Tài liệu này mô tả kiến trúc logic và hạ tầng của hệ thống Currency Exchange Platform. Sơ đồ trực quan có trong [Architecture_Diagram.drawio](../Architecture_Diagram.drawio).
+Tài liệu này mô tả kiến trúc logic và hạ tầng của hệ thống Currency Exchange Platform. Sơ đồ trực quan:
+
+![Architecture](./Architecture_Diagram.drawio.png)
 
 ## Tổng quan
 
