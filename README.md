@@ -62,10 +62,7 @@
 
 ## Getting Started
 
-Clone repo và cài dependencies cho frontend:
-
-```bash
-git clone https://github.com/TheChaser-life/nmcnpm.git
+Clone repo: `git clone https://github.com/TheChaser-life/nmcnpm.git`
 
 Mỗi service có `.env.example` riêng trong thư mục service. File [.env.example](./.env.example) ở root là bản tổng hợp để biết những nhóm biến nào cần chuẩn bị.
 
