@@ -73,7 +73,7 @@ Mỗi service có `.env.example` riêng trong thư mục service. File [.env.exa
 ## Demo và Architecture Diagram
 
 - Architecture diagram: [Architecture_Diagram.drawio](./docs/Architecture_Diagram.drawio.png)
-- Link demo tại đây: `https://nmcnpm.thinhopsops.win'
+- Link demo tại đây: `https://nmcnpm.thinhopsops.win`
 
 ## Tài liệu chi tiết
 
