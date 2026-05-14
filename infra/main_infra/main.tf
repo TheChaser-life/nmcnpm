@@ -96,7 +96,7 @@ module "CloudWatch" {
   sns_topic_arn = module.SNS.sns_topic_arn
 
   primary_db_instance_identifier       = module.RDS_Postgre.primary_db_instance_identifier
-  replica_db_instance_identifier       = module.RDS_Postgre.replica_db_instance_identifier
+  #replica_db_instance_identifier       = module.RDS_Postgre.replica_db_instance_identifier
   exchange_rate_elasticache_cluster_id = module.ElastiCache.exchange_rate_elasticache_cluster_id
   idempotency_elasticache_cluster_id   = module.ElastiCache.idempotency_elasticache_cluster_id
 }

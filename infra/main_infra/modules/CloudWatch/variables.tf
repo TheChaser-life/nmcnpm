@@ -30,9 +30,9 @@ variable "primary_db_instance_identifier" {
     type = string
 }
 
-variable "replica_db_instance_identifier" {
-    type = string
-}
+# variable "replica_db_instance_identifier" {
+#     type = string
+# }
 
 variable "exchange_rate_elasticache_cluster_id" {
     type = string

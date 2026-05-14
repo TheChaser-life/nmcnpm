@@ -279,41 +279,41 @@ resource "aws_cloudwatch_metric_alarm" "primary_rds_cpuutilization_alarm" {
     alarm_actions = [var.sns_topic_arn]
 }
 
-resource "aws_cloudwatch_metric_alarm" "replica_rds_cpuutilization_alarm" {
-    alarm_name = "replica_rds_cpuutilization_alarm"
-    comparison_operator = "GreaterThanThreshold"
-    evaluation_periods = 1
-    threshold = 80
+# resource "aws_cloudwatch_metric_alarm" "replica_rds_cpuutilization_alarm" {
+#     alarm_name = "replica_rds_cpuutilization_alarm"
+#     comparison_operator = "GreaterThanThreshold"
+#     evaluation_periods = 1
+#     threshold = 80
 
-    namespace = "AWS/RDS"
-    metric_name = "CPUUtilization"
-    statistic = "Average"
-    period = 300
+#     namespace = "AWS/RDS"
+#     metric_name = "CPUUtilization"
+#     statistic = "Average"
+#     period = 300
 
-    dimensions = {
-        DBInstanceIdentifier = var.replica_db_instance_identifier
-    }
+#     dimensions = {
+#         DBInstanceIdentifier = var.replica_db_instance_identifier
+#     }
 
-    alarm_actions = [var.sns_topic_arn]
-}
+#     alarm_actions = [var.sns_topic_arn]
+# }
 
-resource "aws_cloudwatch_metric_alarm" "replica_rds_replica_lag_alarm" {
-    alarm_name = "replica_rds_replica_lag_alarm"
-    comparison_operator = "GreaterThanThreshold"
-    evaluation_periods = 1
-    threshold = 60
+# resource "aws_cloudwatch_metric_alarm" "replica_rds_replica_lag_alarm" {
+#     alarm_name = "replica_rds_replica_lag_alarm"
+#     comparison_operator = "GreaterThanThreshold"
+#     evaluation_periods = 1
+#     threshold = 60
 
-    namespace = "AWS/RDS"
-    metric_name = "ReplicaLag"
-    statistic = "Maximum"
-    period = 60
+#     namespace = "AWS/RDS"
+#     metric_name = "ReplicaLag"
+#     statistic = "Maximum"
+#     period = 60
 
-    dimensions = {
-        DBInstanceIdentifier = var.replica_db_instance_identifier
-    }
+#     dimensions = {
+#         DBInstanceIdentifier = var.replica_db_instance_identifier
+#     }
 
-    alarm_actions = [var.sns_topic_arn]
-}
+#     alarm_actions = [var.sns_topic_arn]
+# }
 
 # CloudWatch Alarm cho ElastiCache và Read Replica
 resource "aws_cloudwatch_metric_alarm" "exchange_rate_elasticache_memory_usage_percentage_alarm" {

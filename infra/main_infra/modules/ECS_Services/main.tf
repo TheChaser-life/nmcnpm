@@ -97,7 +97,7 @@ resource "aws_ecs_service" "Streaming_Exchange_Rate_Service" {
   name            = "Streaming_Exchange_Rate_Service"
   cluster         = var.ecs_cluster_arn
   task_definition = var.streaming_task_definition_arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -179,7 +179,7 @@ resource "aws_ecs_service" "Forecast_Exchange_Rate_Service" {
   name            = "Forecast_Exchange_Rate_Service"
   cluster         = var.ecs_cluster_arn
   task_definition = var.forecast_task_definition_arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -201,7 +201,7 @@ resource "aws_ecs_service" "Money_Service" {
   name            = "Money_Service"
   cluster         = var.ecs_cluster_arn
   task_definition = var.money_service_task_definition_arn
-  desired_count   = var.money_service_desired_count
+  desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -223,7 +223,7 @@ resource "aws_ecs_service" "Tour_Service" {
   name            = "Tour_Service"
   cluster         = var.ecs_cluster_arn
   task_definition = var.tour_service_task_definition_arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -245,7 +245,7 @@ resource "aws_ecs_service" "Frontend_Service" {
   name            = "Frontend_Service"
   cluster         = var.ecs_cluster_arn
   task_definition = var.frontend_task_definition_arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
   network_configuration {
     subnets          = var.private_subnet_ids
