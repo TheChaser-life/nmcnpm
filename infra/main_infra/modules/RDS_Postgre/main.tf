@@ -25,12 +25,13 @@ resource "aws_db_instance" "rds_postgres_primary" {
     skip_final_snapshot = true
 }
 
-resource "aws_db_instance" "rds_postgres_read_replica" {
-    identifier = "rds-postgres-read-replica"
-    replicate_source_db = aws_db_instance.rds_postgres_primary.identifier
-    instance_class = "db.t3.micro"
+# Xóa comment nếu cần thiết lập read replica cho RDS PostgreSQL ở AZ 2
+# resource "aws_db_instance" "rds_postgres_read_replica" {
+#     identifier = "rds-postgres-read-replica"
+#     replicate_source_db = aws_db_instance.rds_postgres_primary.identifier
+#     instance_class = "db.t3.micro"
 
-    availability_zone = var.az_2
+#     availability_zone = var.az_2
 
-    skip_final_snapshot = true
-}
+#     skip_final_snapshot = true
+# }

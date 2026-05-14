@@ -419,8 +419,10 @@ resource "aws_sfn_state_machine" "ml_training_pipeline" {
                 Comment  = "Gọi model promotion Lambda để so sánh RMSE và promote model tốt nhất lên SageMaker Endpoint"
 
                 Parameters = {
-                    FunctionName   = var.model_promotion_lambda_arn
-                    "Payload.$"    = "$"
+                    FunctionName = var.model_promotion_lambda_arn
+                    Payload = {
+                        "model_package_arn.$" = "$.ModelPackageArn"
+                    }
                 }
 
                 # Merge kết quả Lambda vào execution context (không ghi đè input)
