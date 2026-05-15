@@ -1,3 +1,5 @@
+# Note
+Currently, I shut down the infra for cost saving. If you want to test it, just contact me XD 
 # NMCNPM Currency Exchange Platform
 
 Ứng dụng web mô phỏng nền tảng theo dõi tỷ giá, trao đổi tiền tệ, dự báo tỷ giá bằng machine learning và gợi ý tour du lịch theo từng loại tiền tệ. Project tập trung vào thiết kế hệ thống cloud-native trên AWS, container hóa service, CI/CD, bảo mật và vận hành hạ tầng bằng Terraform.
